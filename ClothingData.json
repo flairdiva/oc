@@ -1,0 +1,105 @@
+{
+  "signature": "clothing (3).psd_1587916",
+  "psdName": "clothing (3).psd",
+  "tree": [
+    {
+      "id": "folder_1789749412294",
+      "type": "folder",
+      "title": "Pants",
+      "collapsed": false,
+      "items": [
+        {
+          "id": "clothing_1789749460719",
+          "type": "item",
+          "title": "Sport Shorts",
+          "visible": true,
+          "layerIds": [
+            "layer_39",
+            "layer_62",
+            "layer_68"
+          ]
+        },
+        {
+          "id": "clothing_1789749513422",
+          "type": "item",
+          "title": "Debug Unselected",
+          "visible": false,
+          "layerIds": [
+            "layer_67"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folder_1789749532350",
+      "type": "folder",
+      "title": "Skirts",
+      "collapsed": false,
+      "items": [
+        {
+          "id": "clothing_1789750672478",
+          "type": "item",
+          "title": "White",
+          "visible": false,
+          "layerIds": [
+            "layer_69",
+            "layer_64",
+            "layer_41",
+            "layer_18"
+          ]
+        },
+        {
+          "id": "clothing_1789750791990",
+          "type": "item",
+          "title": "black",
+          "visible": false,
+          "layerIds": [
+            "layer_64",
+            "layer_41",
+            "layer_18",
+            "layer_74"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folder_1789751685255",
+      "type": "folder",
+      "title": "Tops",
+      "collapsed": false,
+      "items": [
+        {
+          "id": "clothing_1789751728271",
+          "type": "item",
+          "title": "Debug Unselected",
+          "visible": true,
+          "layerIds": [
+            "layer_169"
+          ]
+        },
+        {
+          "id": "clothing_1789751778119",
+          "type": "item",
+          "title": "FullShirt",
+          "visible": false,
+          "layerIds": [
+            "layer_168",
+            "layer_155",
+            "layer_145"
+          ]
+        },
+        {
+          "id": "clothing_1789751839254",
+          "type": "item",
+          "title": "Short Shirt",
+          "visible": false,
+          "layerIds": [
+            "layer_166",
+            "layer_155",
+            "layer_145"
+          ]
+        }
+      ]
+    }
+  ]
+}
