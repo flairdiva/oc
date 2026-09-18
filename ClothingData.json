@@ -100,6 +100,36 @@
           ]
         }
       ]
+    },
+    {
+      "id": "folder_1789752412831",
+      "type": "folder",
+      "title": "Socks",
+      "collapsed": false,
+      "items": [
+        {
+          "id": "clothing_1789752450486",
+          "type": "item",
+          "title": "Regular White",
+          "visible": true,
+          "layerIds": [
+            "layer_27",
+            "layer_50"
+          ]
+        },
+        {
+          "id": "clothing_1789752509791",
+          "type": "item",
+          "title": "HighTigh White",
+          "visible": false,
+          "layerIds": [
+            "layer_51",
+            "layer_58",
+            "layer_35",
+            "layer_28"
+          ]
+        }
+      ]
     }
   ]
 }
