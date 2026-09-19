@@ -438,7 +438,7 @@
     <div id="toast">You must have at least one item selected!</div>
 
     <!-- DEBUG VERSION DISPLAY -->
-    <div id="debug-version">v---</div>
+    <div id="debug-version">----</div>
 
     <script>
         // --- BACKGROUND CONFIGURATION ---
@@ -672,7 +672,7 @@
 
                 // Display version in the bottom left debug text field
                 if (jsonData.version) {
-                    debugVersionEl.innerText = `v${jsonData.version}`;
+                    debugVersionEl.innerText = `${jsonData.version}`;
                 } else {
                     debugVersionEl.innerText = "v0.0.1";
                 }
