@@ -753,9 +753,17 @@
 
             function drawNode(node) {
                 if (node.hidden) return;
+                
+                // Read and set the layer opacity (defaults to 1 if undefined)
+                const opacity = (typeof node.opacity === 'number') ? node.opacity : 1;
+                
                 if (node.canvas) {
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
                     ctx.drawImage(node.canvas, 0, 0);
+                    ctx.restore();
                 }
+                
                 if (node.children) {
                     node.children.forEach(drawNode);
                 }
@@ -825,8 +833,14 @@
 
             function drawLayerRecursive(node) {
                 if (!node) return;
+                
+                const opacity = (typeof node.opacity === 'number') ? node.opacity : 1;
+
                 if (resolvedLayers.has(node) && node.canvas) {
+                    fCtx.save();
+                    fCtx.globalAlpha = opacity;
                     fCtx.drawImage(node.canvas, 0, 0);
+                    fCtx.restore();
                     hasDrawn = true;
                 }
                 if (node.children) {
