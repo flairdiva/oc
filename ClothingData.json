@@ -1,7 +1,7 @@
 {
   "version": "Rig V3 | 0.0.1",
-  "signature": "clothing (5).psd_1704861",
-  "psdName": "clothing (5).psd",
+  "signature": "themplate.psd_1513048",
+  "psdName": "themplate.psd",
   "tree": [
     {
       "id": "folder_1789749412294",
@@ -109,6 +109,20 @@
             "world/Rig1 (flair)/torso/clothing/swimsuit",
             "world/Rig1 (flair)/torso/lower torso/clothing/swimsuit",
             "world/Rig1 (flair)/torso/breast shadow"
+          ]
+        },
+        {
+          "id": "clothing_1789859032064",
+          "type": "item",
+          "title": "Hoodie",
+          "visible": false,
+          "layerIds": [
+            "world/Rig1 (flair)/torso/left arm/clothing/hoodie",
+            "world/Rig1 (flair)/torso/left arm/lower arm/clothing/sleves/hoodie",
+            "world/Rig1 (flair)/torso/right arm/clothing/hoodie",
+            "world/Rig1 (flair)/torso/right arm/lower arm/clothing/sleves/hoodie",
+            "world/Rig1 (flair)/torso/clothing/Layer 55",
+            "world/Rig1 (flair)/torso/neck/head/inner hair accessories/hoodie capushon"
           ]
         }
       ]
