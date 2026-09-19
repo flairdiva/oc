@@ -4,18 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-
-        <!-- Cache Control Meta Tags -->
+    <!-- Cache Control Meta Tags -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-
-
-
     <title>Clothing Outfit Viewer</title>
+    
     <!-- ag-psd dependency -->
     <script src="https://cdn.jsdelivr.net/npm/ag-psd/dist/bundle.min.js"></script>
+
+    <!-- Firebase SDK (Modular compatibility scripts) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
     <style>
         * {
             box-sizing: border-box;
@@ -30,6 +32,86 @@
             background-color: #1a1a1a;
             color: #e0e0e0;
             overflow: hidden;
+        }
+
+        /* --- AUTH MODAL --- */
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-card {
+            background: #242424;
+            padding: 28px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .auth-card h2 {
+            font-size: 1.25rem;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .auth-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .auth-field label {
+            font-size: 0.8rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .auth-field input {
+            background: #181818;
+            border: 1px solid #3d3d3d;
+            border-radius: 4px;
+            padding: 10px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .auth-field input:focus {
+            border-color: #00e5ff;
+        }
+
+        .auth-btn {
+            background: #00e5ff;
+            color: #121212;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 6px;
+        }
+
+        .auth-btn:hover {
+            background: #00b3cc;
+        }
+
+        #auth-error {
+            color: #ff4d4d;
+            font-size: 0.85rem;
+            text-align: center;
+            display: none;
         }
 
         /* --- PREVIEW PANEL --- */
@@ -186,6 +268,23 @@
 </head>
 <body>
 
+    <!-- AUTHENTICATION OVERLAY -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <h2>Outfit Viewer Access</h2>
+            <div class="auth-field">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="e.g. abby" />
+            </div>
+            <div class="auth-field">
+                <label for="pin">PIN / Password</label>
+                <input type="password" id="pin" placeholder="Enter PIN" />
+            </div>
+            <div id="auth-error">Invalid Username or PIN</div>
+            <button class="auth-btn" onclick="handleLogin()">Login</button>
+        </div>
+    </div>
+
     <!-- PREVIEW AREA -->
     <div id="preview-panel">
         <div id="loading-overlay">
@@ -205,6 +304,13 @@
     <div id="toast">You must have at least one item selected!</div>
 
     <script>
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            databaseURL: "https://flairdiva-7399b-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         // Global State
         let psdTree = null;
         let flatLayers = [];
@@ -217,12 +323,45 @@
         const loadingOverlay = document.getElementById('loading-overlay');
         const loadingText = document.getElementById('loading-text');
         const toast = document.getElementById('toast');
+        const authOverlay = document.getElementById('auth-overlay');
+        const authError = document.getElementById('auth-error');
 
         // Target folders that enforce at least 1 active piece
         const RESTRICTED_FOLDERS = ["pants", "tops"];
 
+        // --- AUTHENTICATION ---
+        async function handleLogin() {
+            const usernameInput = document.getElementById('username').value.trim().toLowerCase();
+            const pinInput = document.getElementById('pin').value.trim();
+
+            if (!usernameInput || !pinInput) {
+                showAuthError("Please enter both username and PIN");
+                return;
+            }
+
+            try {
+                const snapshot = await database.ref(`users/${usernameInput}/pin`).once('value');
+                const storedPin = snapshot.val();
+
+                if (storedPin !== null && String(storedPin) === pinInput) {
+                    authOverlay.style.display = 'none';
+                    initViewer();
+                } else {
+                    showAuthError("Invalid username or PIN");
+                }
+            } catch (err) {
+                console.error("Database auth error:", err);
+                showAuthError("Authentication error. Check connection.");
+            }
+        }
+
+        function showAuthError(msg) {
+            authError.innerText = msg;
+            authError.style.display = 'block';
+        }
+
         // --- INITIALIZATION ---
-        window.addEventListener('DOMContentLoaded', async () => {
+        async function initViewer() {
             try {
                 loadingText.innerText = "Fetching template files...";
                 
@@ -289,7 +428,7 @@
                 console.error(error);
                 loadingText.innerText = `Error: ${error.message}`;
             }
-        });
+        }
 
         // --- RENDER VISIBILITY ---
         function updatePreview() {
