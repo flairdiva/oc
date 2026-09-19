@@ -1,7 +1,7 @@
 {
   "version": "Rig V3 | 0.0.1",
-  "signature": "clothing (3).psd_1587916",
-  "psdName": "clothing (3).psd",
+  "signature": "clothing (5).psd_1704861",
+  "psdName": "clothing (5).psd",
   "tree": [
     {
       "id": "folder_1789749412294",
@@ -15,9 +15,9 @@
           "title": "Sport Shorts",
           "visible": true,
           "layerIds": [
-            "layer_39",
-            "layer_62",
-            "layer_68"
+            "world/Rig1 (flair)/torso/lower torso/left/clothing/pants/sport shorts",
+            "world/Rig1 (flair)/torso/lower torso/right/clothing/pants/sport shorts",
+            "world/Rig1 (flair)/torso/lower torso/clothing/sport shorts"
           ]
         },
         {
@@ -26,7 +26,7 @@
           "title": "Debug Unselected",
           "visible": false,
           "layerIds": [
-            "layer_67"
+            "world/Rig1 (flair)/torso/lower torso/clothing/debug/unselected"
           ]
         }
       ]
@@ -43,10 +43,10 @@
           "title": "White",
           "visible": false,
           "layerIds": [
-            "layer_69",
-            "layer_64",
-            "layer_41",
-            "layer_18"
+            "world/Rig1 (flair)/torso/lower torso/clothing/skirt white",
+            "world/Rig1 (flair)/torso/lower torso/right/clothing/skirt adons/skirt1",
+            "world/Rig1 (flair)/torso/lower torso/left/clothing/skirt addons/skirt1",
+            "world/Rig1 (flair)/torso/lower torso/background ilustrations/underskirt"
           ]
         },
         {
@@ -55,10 +55,10 @@
           "title": "black",
           "visible": false,
           "layerIds": [
-            "layer_64",
-            "layer_41",
-            "layer_18",
-            "layer_74"
+            "world/Rig1 (flair)/torso/lower torso/right/clothing/skirt adons/skirt1",
+            "world/Rig1 (flair)/torso/lower torso/left/clothing/skirt addons/skirt1",
+            "world/Rig1 (flair)/torso/lower torso/background ilustrations/underskirt",
+            "world/Rig1 (flair)/torso/lower torso/clothing/skirt black"
           ]
         }
       ]
@@ -75,7 +75,7 @@
           "title": "Debug Unselected",
           "visible": true,
           "layerIds": [
-            "layer_169"
+            "world/Rig1 (flair)/torso/clothing/debug/unselected"
           ]
         },
         {
@@ -84,9 +84,9 @@
           "title": "FullShirt",
           "visible": false,
           "layerIds": [
-            "layer_168",
-            "layer_155",
-            "layer_145"
+            "world/Rig1 (flair)/torso/clothing/shirt full(skirt comp",
+            "world/Rig1 (flair)/torso/right arm/clothing/Layer 47",
+            "world/Rig1 (flair)/torso/left arm/clothing/Layer 52"
           ]
         },
         {
@@ -95,9 +95,20 @@
           "title": "Short Shirt",
           "visible": false,
           "layerIds": [
-            "layer_166",
-            "layer_155",
-            "layer_145"
+            "world/Rig1 (flair)/torso/clothing/shirt simple",
+            "world/Rig1 (flair)/torso/right arm/clothing/Layer 47",
+            "world/Rig1 (flair)/torso/left arm/clothing/Layer 52"
+          ]
+        },
+        {
+          "id": "clothing_1789857684626",
+          "type": "item",
+          "title": "SwimSuit",
+          "visible": false,
+          "layerIds": [
+            "world/Rig1 (flair)/torso/clothing/swimsuit",
+            "world/Rig1 (flair)/torso/lower torso/clothing/swimsuit",
+            "world/Rig1 (flair)/torso/breast shadow"
           ]
         }
       ]
@@ -114,8 +125,8 @@
           "title": "Regular White",
           "visible": true,
           "layerIds": [
-            "layer_27",
-            "layer_50"
+            "world/Rig1 (flair)/torso/lower torso/left/lower leg/clothing/socks/reg white",
+            "world/Rig1 (flair)/torso/lower torso/right/lower leg/clothing/socks/reg white"
           ]
         },
         {
@@ -124,10 +135,10 @@
           "title": "HighTigh White",
           "visible": false,
           "layerIds": [
-            "layer_51",
-            "layer_58",
-            "layer_35",
-            "layer_28"
+            "world/Rig1 (flair)/torso/lower torso/right/lower leg/clothing/socks/hightigh",
+            "world/Rig1 (flair)/torso/lower torso/right/clothing/socks/hightigh",
+            "world/Rig1 (flair)/torso/lower torso/left/clothing/socks/hightigh",
+            "world/Rig1 (flair)/torso/lower torso/left/lower leg/clothing/socks/hightigh"
           ]
         },
         {
@@ -136,10 +147,10 @@
           "title": "HighTigh Black",
           "visible": false,
           "layerIds": [
-            "layer_36",
-            "layer_52",
-            "layer_59",
-            "layer_29"
+            "world/Rig1 (flair)/torso/lower torso/left/clothing/socks/black hightigh",
+            "world/Rig1 (flair)/torso/lower torso/right/lower leg/clothing/socks/black hightigh",
+            "world/Rig1 (flair)/torso/lower torso/right/clothing/socks/black hightigh",
+            "world/Rig1 (flair)/torso/lower torso/left/lower leg/clothing/socks/black hightigh "
           ]
         },
         {
@@ -148,10 +159,10 @@
           "title": "HighTigh Pink",
           "visible": false,
           "layerIds": [
-            "layer_60",
-            "layer_53",
-            "layer_37",
-            "layer_30"
+            "world/Rig1 (flair)/torso/lower torso/right/clothing/socks/pink hightigh",
+            "world/Rig1 (flair)/torso/lower torso/right/lower leg/clothing/socks/pink hightigh",
+            "world/Rig1 (flair)/torso/lower torso/left/clothing/socks/pink hightigh",
+            "world/Rig1 (flair)/torso/lower torso/left/lower leg/clothing/socks/pink hightigh "
           ]
         }
       ]
@@ -168,7 +179,7 @@
           "title": "MouthV3",
           "visible": true,
           "layerIds": [
-            "layer_114"
+            "world/Rig1 (flair)/torso/neck/head/mouth v3"
           ]
         },
         {
@@ -177,7 +188,7 @@
           "title": "MouthV2",
           "visible": false,
           "layerIds": [
-            "layer_122"
+            "world/Rig1 (flair)/torso/neck/head/mouth v2"
           ]
         },
         {
@@ -186,7 +197,7 @@
           "title": "EyeBags",
           "visible": true,
           "layerIds": [
-            "layer_132"
+            "world/Rig1 (flair)/torso/neck/head/eye bags"
           ]
         },
         {
@@ -195,7 +206,7 @@
           "title": "Blush",
           "visible": false,
           "layerIds": [
-            "layer_129"
+            "world/Rig1 (flair)/torso/neck/head/blush [27]"
           ]
         },
         {
@@ -204,7 +215,7 @@
           "title": "Secondairy Brows",
           "visible": true,
           "layerIds": [
-            "layer_134"
+            "world/Rig1 (flair)/torso/neck/head/addonbrows?"
           ]
         }
       ]
