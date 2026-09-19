@@ -442,7 +442,6 @@
 
     <script>
         // --- BACKGROUND CONFIGURATION ---
-        // Set type to 'video' or 'image'.
         const BACKGROUND_CONFIG = {
             type: "video", // "image" or "video"
             imageSrc: "./background.png",
@@ -462,6 +461,11 @@
         let clothingTree = [];
         let isAuthenticated = false;
 
+        // Fast Lookup Maps for Multi-Tier Layer Matching
+        let layerByPathMap = new Map();
+        let layerByIdMap = new Map();
+        let layerByNameMap = new Map();
+
         // DOM Elements
         const canvas = document.getElementById('preview-canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -478,26 +482,23 @@
         // Target folders that enforce at least 1 active piece
         const RESTRICTED_FOLDERS = ["pants", "tops"];
 
-        // Setup background media source (Only invoked after successful login)
+        // Setup background media source
         function setupBackgroundMedia() {
             if (BACKGROUND_CONFIG.type === "video" && BACKGROUND_CONFIG.videoSrc) {
                 bgVideoLayer.src = BACKGROUND_CONFIG.videoSrc;
                 bgVideoLayer.style.display = "block";
                 bgImageLayer.style.display = "none";
                 
-                // Attempt autoplay with audio enabled
                 bgVideoLayer.muted = false;
                 
                 const playPromise = bgVideoLayer.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(err => {
                         console.warn("Autoplay with audio blocked by browser. Awaiting user interaction.", err);
-                        // Setup user gesture listener to trigger playback with audio on first interaction
                         setupUserInteractionHandler();
                     });
                 }
 
-                // Handle Tab/Page visibility changes to pause audio/video when page is hidden
                 document.addEventListener("visibilitychange", () => {
                     if (!isAuthenticated) return;
                     if (document.hidden) {
@@ -512,14 +513,12 @@
             }
         }
 
-        // Handles user gesture (clicks/touches/keypresses) to enable audio & video playback
         function setupUserInteractionHandler() {
             const startMediaOnInteraction = () => {
                 if (!isAuthenticated) return;
                 if (BACKGROUND_CONFIG.type === "video" && bgVideoLayer.paused) {
                     bgVideoLayer.muted = false;
                     bgVideoLayer.play().then(() => {
-                        // Remove interaction listeners once successfully playing
                         removeInteractionListeners();
                     }).catch(err => {
                         console.error("Video play failed on interaction:", err);
@@ -572,7 +571,6 @@
             }
 
             try {
-                // Fetch the entire user object to check both 'pin' and 'canEdit'
                 const snapshot = await database.ref(`users/${usernameInput}`).once('value');
                 const userData = snapshot.val();
 
@@ -584,19 +582,16 @@
                 const storedPin = userData.pin;
                 const canEdit = userData.canEdit;
 
-                // Verify PIN match
                 if (storedPin === null || String(storedPin) !== pinInput) {
                     showAuthError("Invalid username or PIN");
                     return;
                 }
 
-                // Check if user has edit permissions
                 if (canEdit !== true) {
                     showAuthError("Access denied: that account isn't allowed to be used for this specific application");
                     return;
                 }
 
-                // Set authentication flag, hide login, start background media & initialize application
                 isAuthenticated = true;
                 authOverlay.style.display = 'none';
                 setupBackgroundMedia();
@@ -613,12 +608,51 @@
             authError.style.display = 'block';
         }
 
+        // --- HELPER: HELPER FUNCTION TO GET LAYER PATH ---
+        function getLayerPath(node) {
+            const parts = [];
+            let curr = node;
+            while (curr && curr.name && curr !== psdTree) {
+                parts.unshift(curr.name);
+                curr = curr.parent;
+            }
+            return parts.join('/');
+        }
+
+        // --- MULTI-TIER LAYER RESOLVER ---
+        function resolveLayer(ref) {
+            if (!ref) return null;
+
+            // Tier 1: Exact Path Match
+            if (layerByPathMap.has(ref)) {
+                return layerByPathMap.get(ref);
+            }
+
+            // Tier 2: Legacy ID Match ("layer_14")
+            if (layerByIdMap.has(ref)) {
+                return layerByIdMap.get(ref);
+            }
+
+            // Tier 3: Layer Title / Name Match
+            let layerName = ref;
+            if (ref.includes('/')) {
+                layerName = ref.split('/').pop();
+            } else if (ref.startsWith('layer_')) {
+                layerName = ref.replace('layer_', '');
+            }
+
+            if (layerByNameMap.has(layerName)) {
+                return layerByNameMap.get(layerName);
+            }
+
+            return null;
+        }
+
         // --- INITIALIZATION ---
         async function initViewer() {
             try {
                 loadingText.innerText = "Fetching template files...";
                 
-                // Fetch PSD and JSON in parallel from relative repository paths
                 const [psdResponse, jsonResponse] = await Promise.all([
                     fetch('./themplate.psd'),
                     fetch('./ClothingData.json')
@@ -630,7 +664,6 @@
                 loadingText.innerText = "Parsing PSD model...";
                 const psdBuffer = await psdResponse.arrayBuffer();
                 
-                // Read PSD via ag-psd
                 psdTree = agPsd.readPsd(psdBuffer, {
                     skipImageData: false,
                     useCanvas: true,
@@ -640,13 +673,19 @@
                 canvas.width = psdTree.width;
                 canvas.height = psdTree.height;
 
-                // Normalize PSD Layer Positions
+                // Clear and rebuild lookup maps
                 flatLayers = [];
+                layerByPathMap.clear();
+                layerByIdMap.clear();
+                layerByNameMap.clear();
+
                 let idCounter = 0;
 
-                function normalizeNode(node) {
+                function normalizeNode(node, parent = null) {
+                    node.parent = parent;
                     node._id = "layer_" + (idCounter++);
-                    
+                    node._legacyId = node._id;
+
                     if (node.canvas) {
                         const fullCanvas = document.createElement('canvas');
                         fullCanvas.width = psdTree.width;
@@ -660,7 +699,25 @@
                     }
 
                     flatLayers.push(node);
-                    if (node.children) node.children.forEach(normalizeNode);
+
+                    // Build lookup paths
+                    const path = getLayerPath(node);
+                    if (path) {
+                        node._path = path;
+                        layerByPathMap.set(path, node);
+                    }
+                    if (node._id) {
+                        layerByIdMap.set(node._id, node);
+                    }
+                    if (node.name) {
+                        if (!layerByNameMap.has(node.name)) {
+                            layerByNameMap.set(node.name, node);
+                        }
+                    }
+
+                    if (node.children) {
+                        node.children.forEach(child => normalizeNode(child, node));
+                    }
                 }
 
                 normalizeNode(psdTree);
@@ -670,7 +727,6 @@
                 const jsonData = await jsonResponse.json();
                 clothingTree = jsonData.tree || jsonData.items || [];
 
-                // Display version in the bottom left debug text field
                 if (jsonData.version) {
                     debugVersionEl.innerText = `${jsonData.version}`;
                 } else {
@@ -711,17 +767,26 @@
         function syncLayersFromClothing() {
             const allItems = getAllClothingItems();
             
-            const activeLayerIds = new Set();
+            // Map managed PSD layers to active visibility state
+            const activeLayers = new Set();
+            const managedLayers = new Set();
+
             allItems.forEach(item => {
-                if (item.visible) {
-                    (item.layerIds || []).forEach(lId => activeLayerIds.add(lId));
-                }
+                const refs = item.layerIds || [];
+                refs.forEach(ref => {
+                    const layer = resolveLayer(ref);
+                    if (layer) {
+                        managedLayers.add(layer);
+                        if (item.visible) {
+                            activeLayers.add(layer);
+                        }
+                    }
+                });
             });
 
             flatLayers.forEach(layer => {
-                const isManagedLayer = allItems.some(item => (item.layerIds || []).includes(layer._id));
-                if (isManagedLayer) {
-                    layer.hidden = !activeLayerIds.has(layer._id);
+                if (managedLayers.has(layer)) {
+                    layer.hidden = !activeLayers.has(layer);
                 }
             });
 
@@ -729,25 +794,27 @@
         }
 
         // --- THUMBNAILS (CROPPED BOUNDING BOX RENDER WITH RECURSIVE GROUP RESOLUTION) ---
-        function generateItemThumbnail(targetLayerIds) {
-            if (!psdTree || !targetLayerIds || targetLayerIds.length === 0) return null;
+        function generateItemThumbnail(targetLayerRefs) {
+            if (!psdTree || !targetLayerRefs || targetLayerRefs.length === 0) return null;
 
-            // Expand group layer IDs to include all children IDs contained within those groups
-            const layerSet = new Set(targetLayerIds);
-            
-            function collectChildrenIds(node) {
+            const resolvedLayers = new Set();
+
+            function collectNodeAndChildren(node) {
                 if (!node) return;
-                if (node._id) layerSet.add(node._id);
+                resolvedLayers.add(node);
                 if (node.children) {
-                    node.children.forEach(collectChildrenIds);
+                    node.children.forEach(collectNodeAndChildren);
                 }
             }
 
-            flatLayers.forEach(layer => {
-                if (targetLayerIds.includes(layer._id)) {
-                    collectChildrenIds(layer);
+            targetLayerRefs.forEach(ref => {
+                const targetNode = resolveLayer(ref);
+                if (targetNode) {
+                    collectNodeAndChildren(targetNode);
                 }
             });
+
+            if (resolvedLayers.size === 0) return null;
 
             const fullCanvas = document.createElement('canvas');
             fullCanvas.width = psdTree.width;
@@ -758,7 +825,7 @@
 
             function drawLayerRecursive(node) {
                 if (!node) return;
-                if (layerSet.has(node._id) && node.canvas) {
+                if (resolvedLayers.has(node) && node.canvas) {
                     fCtx.drawImage(node.canvas, 0, 0);
                     hasDrawn = true;
                 }
@@ -788,7 +855,6 @@
                 }
             }
 
-            // Fallback if empty image
             if (minX >= maxX || minY >= maxY) {
                 return fullCanvas.toDataURL();
             }
@@ -864,7 +930,6 @@
             const item = findClothingItem(itemId);
             if (!item) return;
 
-            // If attempting to uncheck, check folder requirements
             if (!desiredState) {
                 const parentFolder = findParentFolderOfItem(itemId);
                 

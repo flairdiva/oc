@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Cache Control Meta Tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <title>Clothing Outfit Viewer</title>
+    
+    <!-- ag-psd dependency -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-psd/dist/bundle.min.js"></script>
+
+    <!-- Firebase SDK (Modular compatibility scripts) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- BACKGROUND MEDIA (IMAGE / VIDEO) --- */
+        #bg-image-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0;
+            display: none;
+        }
+
+        #bg-video-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            display: none;
+            pointer-events: none;
+        }
+
+        /* --- AUTH MODAL --- */
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-card {
+            background: #242424;
+            padding: 28px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .auth-card h2 {
+            font-size: 1.25rem;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .auth-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .auth-field label {
+            font-size: 0.8rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .auth-field input {
+            background: #181818;
+            border: 1px solid #3d3d3d;
+            border-radius: 4px;
+            padding: 10px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .auth-field input:focus {
+            border-color: #ffa3d9;
+        }
+
+        .auth-btn {
+            background: #ffa3d9;
+            color: #121212;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 6px;
+        }
+
+        .auth-btn:hover {
+            background: #a33877;
+        }
+
+        #auth-error {
+            color: #ff4d4d;
+            font-size: 0.85rem;
+            text-align: center;
+            display: none;
+        }
+
+        /* --- PREVIEW PANEL --- */
+        #preview-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background-color: transparent;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(18, 18, 18, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top: 4px solid #ffa3d9;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #preview-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            box-shadow: none;
+            background-color: transparent;
+        }
+
+        /* --- CONTROL PANEL (WARDROBE GRID) --- */
+        #right-panel {
+            width: 320px;
+            min-width: 320px;
+            height: 100vh;
+            background-color: rgba(36, 36, 36, 0.92);
+            backdrop-filter: blur(8px);
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .panel-header {
+            padding: 16px;
+            border-bottom: 1px solid #333;
+            font-size: 1.1rem;
+            font-weight: 600;
+            background-color: rgba(43, 43, 43, 0.95);
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        #clothing-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Custom Scrollbar Styles */
+        #clothing-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #clothing-list::-webkit-scrollbar-track {
+            background: rgba(24, 24, 24, 0.5);
+        }
+        #clothing-list::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+        #clothing-list::-webkit-scrollbar-thumb:hover {
+            background: #ffa3d9;
+        }
+
+        /* Folder Container */
+        .clothing-folder {
+            background: rgba(45, 45, 45, 0.8);
+            border-radius: 8px;
+            border: 1px solid #3d3d3d;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .folder-header {
+            padding: 10px 12px;
+            background: #353535;
+            font-weight: bold;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffa3d9;
+            user-select: none;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        /* Dynamic Wardrobe Grid Layout */
+        .folder-content {
+            padding: 8px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        /* Wardrobe Item Tile with Flexible Auto-Sizing */
+        .clothing-item {
+            position: relative;
+            min-height: 110px;
+            background: #181818;
+            border-radius: 6px;
+            border: 2px solid #333;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 4px 6px 4px;
+            transition: all 0.2s ease;
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        .clothing-item:hover {
+            border-color: #666;
+            background: #202020;
+        }
+
+        /* Active / Selected Wardrobe State */
+        .clothing-item.selected {
+            border-color: #ffa3d9;
+            background: rgba(255, 163, 217, 0.08);
+            box-shadow: 0 0 8px rgba(255, 163, 217, 0.3);
+        }
+
+        .clothing-item.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #ffa3d9;
+            color: #121212;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            font-size: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        /* Wardrobe Thumbnail Frame */
+        .item-thumbnail {
+            width: 100%;
+            height: 65px;
+            object-fit: contain;
+            background-color: transparent;
+            pointer-events: none;
+            display: block;
+        }
+
+        /* Fallback placeholder box when no preview thumbnail is available */
+        .item-thumbnail-placeholder {
+            width: 100%;
+            height: 65px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+        }
+
+        .clothing-title {
+            width: 100%;
+            font-size: 0.72rem;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #ccc;
+            margin-top: 4px;
+            padding: 0 2px;
+            line-height: 1.2;
+        }
+
+        .clothing-item.selected .clothing-title {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* Notification Toast */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff4d4d;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #toast.visible {
+            opacity: 1;
+        }
+
+        /* --- DEBUG VERSION TEXT --- */
+        #debug-version {
+            position: fixed;
+            bottom: 6px;
+            left: 8px;
+            font-size: 20px;
+            color: #ffffff;
+            opacity: 0.6;
+            z-index: 100;
+            pointer-events: none;
+            font-family: monospace;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BACKGROUND MEDIA LAYERS -->
+    <div id="bg-image-layer"></div>
+    <video id="bg-video-layer" loop playsinline></video>
+
+    <!-- AUTHENTICATION OVERLAY -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <h2>Flairs Oc Wardrobe</h2>
+            <div class="auth-field">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="User" />
+            </div>
+            <div class="auth-field">
+                <label for="pin">PIN / Password</label>
+                <input type="password" id="pin" placeholder="Enter PIN" />
+            </div>
+            <div id="auth-error">Invalid Username or PIN</div>
+            <button class="auth-btn" onclick="handleLogin()">Login</button>
+        </div>
+    </div>
+
+    <!-- PREVIEW AREA -->
+    <div id="preview-panel">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div id="loading-text">Loading Outfit Data...</div>
+        </div>
+        <canvas id="preview-canvas"></canvas>
+    </div>
+
+    <!-- CLOTHING SELECTOR PANEL -->
+    <div id="right-panel">
+        <div class="panel-header">Wardrobe</div>
+        <div id="clothing-list"></div>
+    </div>
+
+    <!-- RESTRICTION TOAST -->
+    <div id="toast">You must have at least one item selected!</div>
+
+    <!-- DEBUG VERSION DISPLAY -->
+    <div id="debug-version">----</div>
+
+    <script>
+        // --- BACKGROUND CONFIGURATION ---
+        // Set type to 'video' or 'image'.
+        const BACKGROUND_CONFIG = {
+            type: "video", // "image" or "video"
+            imageSrc: "./background.png",
+            videoSrc: "./background.mp4" // Path to background MP4 file
+        };
+
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            databaseURL: "https://flairdiva-7399b-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Global State
+        let psdTree = null;
+        let flatLayers = [];
+        let clothingTree = [];
+        let isAuthenticated = false;
+
+        // DOM Elements
+        const canvas = document.getElementById('preview-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const clothingListEl = document.getElementById('clothing-list');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const toast = document.getElementById('toast');
+        const authOverlay = document.getElementById('auth-overlay');
+        const authError = document.getElementById('auth-error');
+        const bgImageLayer = document.getElementById('bg-image-layer');
+        const bgVideoLayer = document.getElementById('bg-video-layer');
+        const debugVersionEl = document.getElementById('debug-version');
+
+        // Target folders that enforce at least 1 active piece
+        const RESTRICTED_FOLDERS = ["pants", "tops"];
+
+        // Setup background media source (Only invoked after successful login)
+        function setupBackgroundMedia() {
+            if (BACKGROUND_CONFIG.type === "video" && BACKGROUND_CONFIG.videoSrc) {
+                bgVideoLayer.src = BACKGROUND_CONFIG.videoSrc;
+                bgVideoLayer.style.display = "block";
+                bgImageLayer.style.display = "none";
+                
+                // Attempt autoplay with audio enabled
+                bgVideoLayer.muted = false;
+                
+                const playPromise = bgVideoLayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(err => {
+                        console.warn("Autoplay with audio blocked by browser. Awaiting user interaction.", err);
+                        // Setup user gesture listener to trigger playback with audio on first interaction
+                        setupUserInteractionHandler();
+                    });
+                }
+
+                // Handle Tab/Page visibility changes to pause audio/video when page is hidden
+                document.addEventListener("visibilitychange", () => {
+                    if (!isAuthenticated) return;
+                    if (document.hidden) {
+                        bgVideoLayer.pause();
+                    } else if (BACKGROUND_CONFIG.type === "video") {
+                        bgVideoLayer.play().catch(e => console.log("Play on tab focus prevented:", e));
+                    }
+                });
+
+            } else {
+                setupFallbackImage();
+            }
+        }
+
+        // Handles user gesture (clicks/touches/keypresses) to enable audio & video playback
+        function setupUserInteractionHandler() {
+            const startMediaOnInteraction = () => {
+                if (!isAuthenticated) return;
+                if (BACKGROUND_CONFIG.type === "video" && bgVideoLayer.paused) {
+                    bgVideoLayer.muted = false;
+                    bgVideoLayer.play().then(() => {
+                        // Remove interaction listeners once successfully playing
+                        removeInteractionListeners();
+                    }).catch(err => {
+                        console.error("Video play failed on interaction:", err);
+                    });
+                } else {
+                    removeInteractionListeners();
+                }
+            };
+
+            function removeInteractionListeners() {
+                window.removeEventListener('click', startMediaOnInteraction);
+                window.removeEventListener('keydown', startMediaOnInteraction);
+                window.removeEventListener('touchstart', startMediaOnInteraction);
+            }
+
+            window.addEventListener('click', startMediaOnInteraction, { once: false });
+            window.addEventListener('keydown', startMediaOnInteraction, { once: false });
+            window.addEventListener('touchstart', startMediaOnInteraction, { once: false });
+        }
+
+        function setupFallbackImage() {
+            if (BACKGROUND_CONFIG.imageSrc) {
+                bgImageLayer.style.backgroundImage = `url('${BACKGROUND_CONFIG.imageSrc}')`;
+                bgImageLayer.style.display = "block";
+            }
+            bgVideoLayer.style.display = "none";
+        }
+
+        // --- URL PARAMETER AUTO-LOGIN & INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const userParam = urlParams.get('user');
+            const pinParam = urlParams.get('pin');
+
+            if (userParam && pinParam) {
+                document.getElementById('username').value = userParam;
+                document.getElementById('pin').value = pinParam;
+                handleLogin(userParam, pinParam);
+            }
+        });
+
+        // --- AUTHENTICATION ---
+        async function handleLogin(providedUser, providedPin) {
+            const usernameInput = (providedUser || document.getElementById('username').value).trim().toLowerCase();
+            const pinInput = (providedPin || document.getElementById('pin').value).trim();
+
+            if (!usernameInput || !pinInput) {
+                showAuthError("Please enter both username and PIN");
+                return;
+            }
+
+            try {
+                // Fetch the entire user object to check both 'pin' and 'canEdit'
+                const snapshot = await database.ref(`users/${usernameInput}`).once('value');
+                const userData = snapshot.val();
+
+                if (!userData) {
+                    showAuthError("Invalid username or PIN");
+                    return;
+                }
+
+                const storedPin = userData.pin;
+                const canEdit = userData.canEdit;
+
+                // Verify PIN match
+                if (storedPin === null || String(storedPin) !== pinInput) {
+                    showAuthError("Invalid username or PIN");
+                    return;
+                }
+
+                // Check if user has edit permissions
+                if (canEdit !== true) {
+                    showAuthError("Access denied: that account isn't allowed to be used for this specific application");
+                    return;
+                }
+
+                // Set authentication flag, hide login, start background media & initialize application
+                isAuthenticated = true;
+                authOverlay.style.display = 'none';
+                setupBackgroundMedia();
+                initViewer();
+
+            } catch (err) {
+                console.error("Database auth error:", err);
+                showAuthError("Authentication error. Check connection.");
+            }
+        }
+
+        function showAuthError(msg) {
+            authError.innerText = msg;
+            authError.style.display = 'block';
+        }
+
+        // --- INITIALIZATION ---
+        async function initViewer() {
+            try {
+                loadingText.innerText = "Fetching template files...";
+                
+                // Fetch PSD and JSON in parallel from relative repository paths
+                const [psdResponse, jsonResponse] = await Promise.all([
+                    fetch('./themplate.psd'),
+                    fetch('./ClothingData.json')
+                ]);
+
+                if (!psdResponse.ok) throw new Error("Failed to load 'themplate.psd'");
+                if (!jsonResponse.ok) throw new Error("Failed to load 'ClothingData.json'");
+
+                loadingText.innerText = "Parsing PSD model...";
+                const psdBuffer = await psdResponse.arrayBuffer();
+                
+                // Read PSD via ag-psd
+                psdTree = agPsd.readPsd(psdBuffer, {
+                    skipImageData: false,
+                    useCanvas: true,
+                    skipThumbnail: true
+                });
+
+                canvas.width = psdTree.width;
+                canvas.height = psdTree.height;
+
+                // Normalize PSD Layer Positions
+                flatLayers = [];
+                let idCounter = 0;
+
+                function normalizeNode(node) {
+                    node._id = "layer_" + (idCounter++);
+                    
+                    if (node.canvas) {
+                        const fullCanvas = document.createElement('canvas');
+                        fullCanvas.width = psdTree.width;
+                        fullCanvas.height = psdTree.height;
+                        const fCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
+                        fCtx.drawImage(node.canvas, node.left || 0, node.top || 0);
+
+                        node.canvas = fullCanvas;
+                        node.left = 0;
+                        node.top = 0;
+                    }
+
+                    flatLayers.push(node);
+                    if (node.children) node.children.forEach(normalizeNode);
+                }
+
+                normalizeNode(psdTree);
+
+                // Load JSON Config
+                loadingText.innerText = "Applying configuration...";
+                const jsonData = await jsonResponse.json();
+                clothingTree = jsonData.tree || jsonData.items || [];
+
+                // Display version in the bottom left debug text field
+                if (jsonData.version) {
+                    debugVersionEl.innerText = `${jsonData.version}`;
+                } else {
+                    debugVersionEl.innerText = "v0.0.1";
+                }
+
+                // Render UI and apply visibility
+                renderClothingList();
+                syncLayersFromClothing();
+
+                // Hide Loading Screen
+                loadingOverlay.style.display = 'none';
+
+            } catch (error) {
+                console.error(error);
+                loadingText.innerText = `Error: ${error.message}`;
+            }
+        }
+
+        // --- RENDER VISIBILITY ---
+        function updatePreview() {
+            if (!psdTree) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            function drawNode(node) {
+                if (node.hidden) return;
+                if (node.canvas) {
+                    ctx.drawImage(node.canvas, 0, 0);
+                }
+                if (node.children) {
+                    node.children.forEach(drawNode);
+                }
+            }
+
+            drawNode(psdTree);
+        }
+
+        function syncLayersFromClothing() {
+            const allItems = getAllClothingItems();
+            
+            const activeLayerIds = new Set();
+            allItems.forEach(item => {
+                if (item.visible) {
+                    (item.layerIds || []).forEach(lId => activeLayerIds.add(lId));
+                }
+            });
+
+            flatLayers.forEach(layer => {
+                const isManagedLayer = allItems.some(item => (item.layerIds || []).includes(layer._id));
+                if (isManagedLayer) {
+                    layer.hidden = !activeLayerIds.has(layer._id);
+                }
+            });
+
+            updatePreview();
+        }
+
+        // --- THUMBNAILS (CROPPED BOUNDING BOX RENDER WITH RECURSIVE GROUP RESOLUTION) ---
+        function generateItemThumbnail(targetLayerIds) {
+            if (!psdTree || !targetLayerIds || targetLayerIds.length === 0) return null;
+
+            // Expand group layer IDs to include all children IDs contained within those groups
+            const layerSet = new Set(targetLayerIds);
+            
+            function collectChildrenIds(node) {
+                if (!node) return;
+                if (node._id) layerSet.add(node._id);
+                if (node.children) {
+                    node.children.forEach(collectChildrenIds);
+                }
+            }
+
+            flatLayers.forEach(layer => {
+                if (targetLayerIds.includes(layer._id)) {
+                    collectChildrenIds(layer);
+                }
+            });
+
+            const fullCanvas = document.createElement('canvas');
+            fullCanvas.width = psdTree.width;
+            fullCanvas.height = psdTree.height;
+            const fCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
+
+            let hasDrawn = false;
+
+            function drawLayerRecursive(node) {
+                if (!node) return;
+                if (layerSet.has(node._id) && node.canvas) {
+                    fCtx.drawImage(node.canvas, 0, 0);
+                    hasDrawn = true;
+                }
+                if (node.children) {
+                    node.children.forEach(drawLayerRecursive);
+                }
+            }
+
+            drawLayerRecursive(psdTree);
+
+            if (!hasDrawn) return null;
+
+            // Crop to visible non-transparent content
+            const imgData = fCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height);
+            const data = imgData.data;
+            let minX = fullCanvas.width, minY = fullCanvas.height, maxX = 0, maxY = 0;
+
+            for (let y = 0; y < fullCanvas.height; y++) {
+                for (let x = 0; x < fullCanvas.width; x++) {
+                    const alpha = data[(y * fullCanvas.width + x) * 4 + 3];
+                    if (alpha > 5) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+
+            // Fallback if empty image
+            if (minX >= maxX || minY >= maxY) {
+                return fullCanvas.toDataURL();
+            }
+
+            const cropWidth = maxX - minX + 1;
+            const cropHeight = maxY - minY + 1;
+
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = cropWidth;
+            cropCanvas.height = cropHeight;
+            const cCtx = cropCanvas.getContext('2d');
+
+            cCtx.drawImage(fullCanvas, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+            return cropCanvas.toDataURL();
+        }
+
+        // --- UI BUILDING (WARDROBE GRID) ---
+        function renderClothingList() {
+            clothingListEl.innerHTML = '';
+
+            function buildItemDOM(item, parentContainer) {
+                const el = document.createElement('div');
+                el.className = `clothing-item ${item.visible ? 'selected' : ''}`;
+                el.title = item.title || item.name || '';
+
+                const thumbUrl = generateItemThumbnail(item.layerIds || []);
+                const thumbMarkup = thumbUrl 
+                    ? `<img class="item-thumbnail" src="${thumbUrl}" alt="${item.title || ''}" />` 
+                    : `<div class="item-thumbnail-placeholder">No Preview</div>`;
+
+                el.innerHTML = `
+                    ${thumbMarkup}
+                    <span class="clothing-title">${item.title || item.name || 'Item'}</span>
+                `;
+
+                el.addEventListener('click', () => {
+                    handleToggleRequest(item.id, !item.visible);
+                });
+
+                parentContainer.appendChild(el);
+            }
+
+            function buildFolderDOM(folder) {
+                const folderEl = document.createElement('div');
+                folderEl.className = 'clothing-folder';
+
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.innerHTML = `<span>👕</span><span class="folder-title">${folder.title || folder.name || 'Folder'}</span>`;
+
+                const content = document.createElement('div');
+                content.className = 'folder-content';
+
+                const items = folder.items || folder.children || [];
+                items.forEach(child => buildItemDOM(child, content));
+
+                folderEl.appendChild(header);
+                folderEl.appendChild(content);
+                clothingListEl.appendChild(folderEl);
+            }
+
+            clothingTree.forEach(node => {
+                if (node.type === 'folder' || node.items || node.children) {
+                    buildFolderDOM(node);
+                } else {
+                    buildItemDOM(node, clothingListEl);
+                }
+            });
+        }
+
+        // --- RESTRICTION LOGIC ---
+        function handleToggleRequest(itemId, desiredState) {
+            const item = findClothingItem(itemId);
+            if (!item) return;
+
+            // If attempting to uncheck, check folder requirements
+            if (!desiredState) {
+                const parentFolder = findParentFolderOfItem(itemId);
+                
+                if (parentFolder && RESTRICTED_FOLDERS.includes((parentFolder.title || '').trim().toLowerCase())) {
+                    const items = parentFolder.items || parentFolder.children || [];
+                    const activeInFolder = items.filter(i => i.visible);
+                    
+                    if (activeInFolder.length <= 1) {
+                        showToast(`Must have at least 1 item equipped in ${parentFolder.title}!`);
+                        return;
+                    }
+                }
+            }
+
+            item.visible = desiredState;
+            renderClothingList();
+            syncLayersFromClothing();
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.classList.add('visible');
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 2500);
+        }
+
+        // --- HELPERS ---
+        function findClothingItem(id, list = clothingTree) {
+            for (let node of list) {
+                if (node.id === id) return node;
+                const items = node.items || node.children;
+                if (items) {
+                    const found = findClothingItem(id, items);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        function findParentFolderOfItem(itemId, list = clothingTree) {
+            for (let node of list) {
+                const items = node.items || node.children;
+                if (items) {
+                    if (items.some(child => child.id === itemId)) {
+                        return node;
+                    }
+                    const found = findParentFolderOfItem(itemId, items);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        function getAllClothingItems(list = clothingTree) {
+            let results = [];
+            for (let node of list) {
+                if (node.type === 'item' || (!node.items && !node.children)) {
+                    results.push(node);
+                } else {
+                    const items = node.items || node.children || [];
+                    results = results.concat(getAllClothingItems(items));
+                }
+            }
+            return results;
+        }
+    </script>
+</body>
+</html>
