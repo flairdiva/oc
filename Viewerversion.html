@@ -30,13 +30,29 @@
             display: flex;
             height: 100vh;
             background-color: #1a1a1a;
-            /* Global background image */
+            color: #e0e0e0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Dynamic Background Video Container */
+        #bg-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            display: none;
+        }
+
+        /* Background Fallback Image (When no video is specified) */
+        .bg-image-active {
             background-image: url('https://flairdiva.github.io/oc/background.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            color: #e0e0e0;
-            overflow: hidden;
         }
 
         /* --- AUTH MODAL --- */
@@ -129,6 +145,7 @@
             position: relative;
             background-color: transparent;
             padding: 20px;
+            z-index: 1;
         }
 
         #loading-overlay {
@@ -165,6 +182,31 @@
             background-color: transparent;
         }
 
+        /* Audio Toggle Button */
+        #audio-toggle {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 20;
+            background: rgba(36, 36, 36, 0.85);
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s ease;
+        }
+
+        #audio-toggle:hover {
+            border-color: #ffa3d9;
+            background: rgba(50, 50, 50, 0.95);
+        }
+
         /* --- CONTROL PANEL (WARDROBE GRID) --- */
         #right-panel {
             width: 320px;
@@ -176,6 +218,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            z-index: 1;
         }
 
         .panel-header {
@@ -358,7 +401,13 @@
         }
     </style>
 </head>
-<body>
+<body class="bg-image-active">
+
+    <!-- DYNAMIC BACKGROUND VIDEO LAYER -->
+    <video id="bg-video" autoplay loop muted playsinline></video>
+
+    <!-- AMBIENT BACKGROUND AUDIO -->
+    <audio id="ambient-audio" loop src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_196d0371fa.mp3"></audio>
 
     <!-- AUTHENTICATION OVERLAY -->
     <div id="auth-overlay">
@@ -384,6 +433,12 @@
             <div id="loading-text">Loading Outfit Data...</div>
         </div>
         <canvas id="preview-canvas"></canvas>
+
+        <!-- AMBIENT SOUND CONTROL TOGGLE -->
+        <button id="audio-toggle" onclick="toggleAudio()">
+            <span id="audio-icon">🔊</span>
+            <span id="audio-status">Sound: Off</span>
+        </button>
     </div>
 
     <!-- CLOTHING SELECTOR PANEL -->
@@ -396,6 +451,10 @@
     <div id="toast">You must have at least one item selected!</div>
 
     <script>
+        // CONFIGURATION: Set path or URL to an image or an MP4 video file
+        // e.g., 'https://flairdiva.github.io/oc/background.png' or './background.mp4'
+        const BACKGROUND_MEDIA_URL = 'https://flairdiva.github.io/oc/background.png';
+
         // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
             databaseURL: "https://flairdiva-7399b-default-rtdb.europe-west1.firebasedatabase.app"
@@ -407,6 +466,7 @@
         let psdTree = null;
         let flatLayers = [];
         let clothingTree = [];
+        let isAudioPlaying = false;
 
         // DOM Elements
         const canvas = document.getElementById('preview-canvas');
@@ -417,12 +477,54 @@
         const toast = document.getElementById('toast');
         const authOverlay = document.getElementById('auth-overlay');
         const authError = document.getElementById('auth-error');
+        const bgVideo = document.getElementById('bg-video');
+        const ambientAudio = document.getElementById('ambient-audio');
 
         // Target folders that enforce at least 1 active piece
         const RESTRICTED_FOLDERS = ["pants", "tops"];
 
+        // --- BACKGROUND MEDIA HANDLING ---
+        function initBackgroundMedia() {
+            if (!BACKGROUND_MEDIA_URL) return;
+
+            const isVideo = BACKGROUND_MEDIA_URL.toLowerCase().endsWith('.mp4') || BACKGROUND_MEDIA_URL.toLowerCase().endsWith('.webm');
+
+            if (isVideo) {
+                document.body.classList.remove('bg-image-active');
+                bgVideo.src = BACKGROUND_MEDIA_URL;
+                bgVideo.style.display = 'block';
+                bgVideo.play().catch(err => console.log('Video autoplay deferred:', err));
+            } else {
+                bgVideo.style.display = 'none';
+                document.body.style.backgroundImage = `url('${BACKGROUND_MEDIA_URL}')`;
+                document.body.classList.add('bg-image-active');
+            }
+        }
+
+        // --- AUDIO CONTROLLER ---
+        function toggleAudio() {
+            const statusEl = document.getElementById('audio-status');
+            const iconEl = document.getElementById('audio-icon');
+
+            if (!isAudioPlaying) {
+                ambientAudio.volume = 0.25; // Subtle background volume
+                ambientAudio.play().then(() => {
+                    isAudioPlaying = true;
+                    statusEl.innerText = "Sound: On";
+                    iconEl.innerText = "🔊";
+                }).catch(err => console.error("Audio playback prevented:", err));
+            } else {
+                ambientAudio.pause();
+                isAudioPlaying = false;
+                statusEl.innerText = "Sound: Off";
+                iconEl.innerText = "🔇";
+            }
+        }
+
         // --- URL PARAMETER AUTO-LOGIN & INIT ---
         window.addEventListener('DOMContentLoaded', () => {
+            initBackgroundMedia();
+
             const urlParams = new URLSearchParams(window.location.search);
             const userParam = urlParams.get('user');
             const pinParam = urlParams.get('pin');
@@ -573,9 +675,26 @@
             updatePreview();
         }
 
-        // --- THUMBNAILS (CROPPED BOUNDING BOX RENDER) ---
-        function generateItemThumbnail(layerIds) {
-            if (!psdTree || !layerIds || layerIds.length === 0) return null;
+        // --- THUMBNAILS (CROPPED BOUNDING BOX RENDER WITH RECURSIVE GROUP RESOLUTION) ---
+        function generateItemThumbnail(targetLayerIds) {
+            if (!psdTree || !targetLayerIds || targetLayerIds.length === 0) return null;
+
+            // Expand group layer IDs to include all children IDs contained within those groups
+            const layerSet = new Set(targetLayerIds);
+            
+            function collectChildrenIds(node) {
+                if (!node) return;
+                if (node._id) layerSet.add(node._id);
+                if (node.children) {
+                    node.children.forEach(collectChildrenIds);
+                }
+            }
+
+            flatLayers.forEach(layer => {
+                if (targetLayerIds.includes(layer._id)) {
+                    collectChildrenIds(layer);
+                }
+            });
 
             const fullCanvas = document.createElement('canvas');
             fullCanvas.width = psdTree.width;
@@ -586,7 +705,7 @@
 
             function drawLayerRecursive(node) {
                 if (!node) return;
-                if (layerIds.includes(node._id) && node.canvas) {
+                if (layerSet.has(node._id) && node.canvas) {
                     fCtx.drawImage(node.canvas, 0, 0);
                     hasDrawn = true;
                 }
