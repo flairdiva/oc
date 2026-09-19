@@ -35,8 +35,21 @@
             position: relative;
         }
 
-        /* Dynamic Background Video Container */
-        #bg-video {
+        /* --- BACKGROUND MEDIA (IMAGE / VIDEO) --- */
+        #bg-image-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0;
+            display: none;
+        }
+
+        #bg-video-layer {
             position: absolute;
             top: 0;
             left: 0;
@@ -45,14 +58,7 @@
             object-fit: cover;
             z-index: 0;
             display: none;
-        }
-
-        /* Background Fallback Image (When no video is specified) */
-        .bg-image-active {
-            background-image: url('https://flairdiva.github.io/oc/background.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
+            pointer-events: none;
         }
 
         /* --- AUTH MODAL --- */
@@ -180,31 +186,6 @@
             object-fit: contain;
             box-shadow: none;
             background-color: transparent;
-        }
-
-        /* Audio Toggle Button */
-        #audio-toggle {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            z-index: 20;
-            background: rgba(36, 36, 36, 0.85);
-            border: 1px solid #444;
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s ease;
-        }
-
-        #audio-toggle:hover {
-            border-color: #ffa3d9;
-            background: rgba(50, 50, 50, 0.95);
         }
 
         /* --- CONTROL PANEL (WARDROBE GRID) --- */
@@ -401,13 +382,11 @@
         }
     </style>
 </head>
-<body class="bg-image-active">
+<body>
 
-    <!-- DYNAMIC BACKGROUND VIDEO LAYER -->
-    <video id="bg-video" autoplay loop muted playsinline></video>
-
-    <!-- AMBIENT BACKGROUND AUDIO -->
-    <audio id="ambient-audio" loop src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_196d0371fa.mp3"></audio>
+    <!-- BACKGROUND MEDIA LAYERS -->
+    <div id="bg-image-layer"></div>
+    <video id="bg-video-layer" loop playsinline></video>
 
     <!-- AUTHENTICATION OVERLAY -->
     <div id="auth-overlay">
@@ -433,12 +412,6 @@
             <div id="loading-text">Loading Outfit Data...</div>
         </div>
         <canvas id="preview-canvas"></canvas>
-
-        <!-- AMBIENT SOUND CONTROL TOGGLE -->
-        <button id="audio-toggle" onclick="toggleAudio()">
-            <span id="audio-icon">🔊</span>
-            <span id="audio-status">Sound: Off</span>
-        </button>
     </div>
 
     <!-- CLOTHING SELECTOR PANEL -->
@@ -451,9 +424,13 @@
     <div id="toast">You must have at least one item selected!</div>
 
     <script>
-        // CONFIGURATION: Set path or URL to an image or an MP4 video file
-        // e.g., 'https://flairdiva.github.io/oc/background.png' or './background.mp4'
-        const BACKGROUND_MEDIA_URL = 'https://flairdiva.github.io/oc/background.png';
+        // --- BACKGROUND CONFIGURATION ---
+        // Set type to 'video' or 'image'.
+        const BACKGROUND_CONFIG = {
+            type: "video", // "image" or "video"
+            imageSrc: "./background.png",
+            videoSrc: "./background.mp4" // Path to background MP4 file
+        };
 
         // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
@@ -466,7 +443,6 @@
         let psdTree = null;
         let flatLayers = [];
         let clothingTree = [];
-        let isAudioPlaying = false;
 
         // DOM Elements
         const canvas = document.getElementById('preview-canvas');
@@ -477,53 +453,83 @@
         const toast = document.getElementById('toast');
         const authOverlay = document.getElementById('auth-overlay');
         const authError = document.getElementById('auth-error');
-        const bgVideo = document.getElementById('bg-video');
-        const ambientAudio = document.getElementById('ambient-audio');
+        const bgImageLayer = document.getElementById('bg-image-layer');
+        const bgVideoLayer = document.getElementById('bg-video-layer');
 
         // Target folders that enforce at least 1 active piece
         const RESTRICTED_FOLDERS = ["pants", "tops"];
 
-        // --- BACKGROUND MEDIA HANDLING ---
-        function initBackgroundMedia() {
-            if (!BACKGROUND_MEDIA_URL) return;
+        // Setup background media source
+        function setupBackgroundMedia() {
+            if (BACKGROUND_CONFIG.type === "video" && BACKGROUND_CONFIG.videoSrc) {
+                bgVideoLayer.src = BACKGROUND_CONFIG.videoSrc;
+                bgVideoLayer.style.display = "block";
+                bgImageLayer.style.display = "none";
+                
+                // Attempt autoplay with audio enabled
+                bgVideoLayer.muted = false;
+                
+                const playPromise = bgVideoLayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(err => {
+                        console.warn("Autoplay with audio blocked by browser. Awaiting user interaction.", err);
+                        // Setup user gesture listener to trigger playback with audio on first interaction
+                        setupUserInteractionHandler();
+                    });
+                }
 
-            const isVideo = BACKGROUND_MEDIA_URL.toLowerCase().endsWith('.mp4') || BACKGROUND_MEDIA_URL.toLowerCase().endsWith('.webm');
+                // Handle Tab/Page visibility changes to pause audio/video when page is hidden
+                document.addEventListener("visibilitychange", () => {
+                    if (document.hidden) {
+                        bgVideoLayer.pause();
+                    } else if (BACKGROUND_CONFIG.type === "video") {
+                        bgVideoLayer.play().catch(e => console.log("Play on tab focus prevented:", e));
+                    }
+                });
 
-            if (isVideo) {
-                document.body.classList.remove('bg-image-active');
-                bgVideo.src = BACKGROUND_MEDIA_URL;
-                bgVideo.style.display = 'block';
-                bgVideo.play().catch(err => console.log('Video autoplay deferred:', err));
             } else {
-                bgVideo.style.display = 'none';
-                document.body.style.backgroundImage = `url('${BACKGROUND_MEDIA_URL}')`;
-                document.body.classList.add('bg-image-active');
+                setupFallbackImage();
             }
         }
 
-        // --- AUDIO CONTROLLER ---
-        function toggleAudio() {
-            const statusEl = document.getElementById('audio-status');
-            const iconEl = document.getElementById('audio-icon');
+        // Handles user gesture (clicks/touches/keypresses) to enable audio & video playback
+        function setupUserInteractionHandler() {
+            const startMediaOnInteraction = () => {
+                if (BACKGROUND_CONFIG.type === "video" && bgVideoLayer.paused) {
+                    bgVideoLayer.muted = false;
+                    bgVideoLayer.play().then(() => {
+                        // Remove interaction listeners once successfully playing
+                        removeInteractionListeners();
+                    }).catch(err => {
+                        console.error("Video play failed on interaction:", err);
+                    });
+                } else {
+                    removeInteractionListeners();
+                }
+            };
 
-            if (!isAudioPlaying) {
-                ambientAudio.volume = 0.25; // Subtle background volume
-                ambientAudio.play().then(() => {
-                    isAudioPlaying = true;
-                    statusEl.innerText = "Sound: On";
-                    iconEl.innerText = "🔊";
-                }).catch(err => console.error("Audio playback prevented:", err));
-            } else {
-                ambientAudio.pause();
-                isAudioPlaying = false;
-                statusEl.innerText = "Sound: Off";
-                iconEl.innerText = "🔇";
+            function removeInteractionListeners() {
+                window.removeEventListener('click', startMediaOnInteraction);
+                window.removeEventListener('keydown', startMediaOnInteraction);
+                window.removeEventListener('touchstart', startMediaOnInteraction);
             }
+
+            window.addEventListener('click', startMediaOnInteraction, { once: false });
+            window.addEventListener('keydown', startMediaOnInteraction, { once: false });
+            window.addEventListener('touchstart', startMediaOnInteraction, { once: false });
+        }
+
+        function setupFallbackImage() {
+            if (BACKGROUND_CONFIG.imageSrc) {
+                bgImageLayer.style.backgroundImage = `url('${BACKGROUND_CONFIG.imageSrc}')`;
+                bgImageLayer.style.display = "block";
+            }
+            bgVideoLayer.style.display = "none";
         }
 
         // --- URL PARAMETER AUTO-LOGIN & INIT ---
         window.addEventListener('DOMContentLoaded', () => {
-            initBackgroundMedia();
+            setupBackgroundMedia();
 
             const urlParams = new URLSearchParams(window.location.search);
             const userParam = urlParams.get('user');
