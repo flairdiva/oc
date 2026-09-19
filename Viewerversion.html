@@ -91,7 +91,7 @@
         }
 
         .auth-btn {
-            background: #00e5ff;
+            background: #ffa3d9;
             color: #121212;
             border: none;
             padding: 10px;
@@ -104,7 +104,7 @@
         }
 
         .auth-btn:hover {
-            background: #00b3cc;
+            background: #a33877;
         }
 
         #auth-error {
@@ -141,7 +141,7 @@
             width: 40px;
             height: 40px;
             border: 4px solid #333;
-            border-top: 4px solid #00e5ff;
+            border-top: 4px solid #ffa3d9;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 12px;
@@ -271,10 +271,10 @@
     <!-- AUTHENTICATION OVERLAY -->
     <div id="auth-overlay">
         <div class="auth-card">
-            <h2>Outfit Viewer Access</h2>
+            <h2>Flairs Oc Wardrobe</h2>
             <div class="auth-field">
                 <label for="username">Username</label>
-                <input type="text" id="username" placeholder="e.g. abby" />
+                <input type="text" id="username" placeholder="User" />
             </div>
             <div class="auth-field">
                 <label for="pin">PIN / Password</label>
@@ -329,10 +329,23 @@
         // Target folders that enforce at least 1 active piece
         const RESTRICTED_FOLDERS = ["pants", "tops"];
 
+        // --- URL PARAMETER AUTO-LOGIN & INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const userParam = urlParams.get('user');
+            const pinParam = urlParams.get('pin');
+
+            if (userParam && pinParam) {
+                document.getElementById('username').value = userParam;
+                document.getElementById('pin').value = pinParam;
+                handleLogin(userParam, pinParam);
+            }
+        });
+
         // --- AUTHENTICATION ---
-        async function handleLogin() {
-            const usernameInput = document.getElementById('username').value.trim().toLowerCase();
-            const pinInput = document.getElementById('pin').value.trim();
+        async function handleLogin(providedUser, providedPin) {
+            const usernameInput = (providedUser || document.getElementById('username').value).trim().toLowerCase();
+            const pinInput = (providedPin || document.getElementById('pin').value).trim();
 
             if (!usernameInput || !pinInput) {
                 showAuthError("Please enter both username and PIN");
