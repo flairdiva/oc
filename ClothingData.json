@@ -128,6 +128,83 @@
             "layer_35",
             "layer_28"
           ]
+        },
+        {
+          "id": "clothing_1789823356795",
+          "type": "item",
+          "title": "HighTigh Black",
+          "visible": false,
+          "layerIds": [
+            "layer_36",
+            "layer_52",
+            "layer_59",
+            "layer_29"
+          ]
+        },
+        {
+          "id": "clothing_1789823473586",
+          "type": "item",
+          "title": "HighTigh Pink",
+          "visible": false,
+          "layerIds": [
+            "layer_60",
+            "layer_53",
+            "layer_37",
+            "layer_30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "folder_1789823723819",
+      "type": "folder",
+      "title": "Facial Settings",
+      "collapsed": false,
+      "items": [
+        {
+          "id": "clothing_1789823742595",
+          "type": "item",
+          "title": "MouthV3",
+          "visible": true,
+          "layerIds": [
+            "layer_114"
+          ]
+        },
+        {
+          "id": "clothing_1789823764651",
+          "type": "item",
+          "title": "MouthV2",
+          "visible": false,
+          "layerIds": [
+            "layer_122"
+          ]
+        },
+        {
+          "id": "clothing_1789824006579",
+          "type": "item",
+          "title": "EyeBags",
+          "visible": true,
+          "layerIds": [
+            "layer_132"
+          ]
+        },
+        {
+          "id": "clothing_1789824029971",
+          "type": "item",
+          "title": "Blush",
+          "visible": false,
+          "layerIds": [
+            "layer_129"
+          ]
+        },
+        {
+          "id": "clothing_1789824060010",
+          "type": "item",
+          "title": "Secondairy Brows",
+          "visible": true,
+          "layerIds": [
+            "layer_134"
+          ]
         }
       ]
     }
