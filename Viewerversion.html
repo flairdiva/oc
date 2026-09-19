@@ -380,6 +380,20 @@
         #toast.visible {
             opacity: 1;
         }
+
+        /* --- DEBUG VERSION TEXT --- */
+        #debug-version {
+            position: fixed;
+            bottom: 6px;
+            left: 8px;
+            font-size: 20px;
+            color: #ffffff;
+            opacity: 0.6;
+            z-index: 100;
+            pointer-events: none;
+            font-family: monospace;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+        }
     </style>
 </head>
 <body>
@@ -423,6 +437,9 @@
     <!-- RESTRICTION TOAST -->
     <div id="toast">You must have at least one item selected!</div>
 
+    <!-- DEBUG VERSION DISPLAY -->
+    <div id="debug-version">v---</div>
+
     <script>
         // --- BACKGROUND CONFIGURATION ---
         // Set type to 'video' or 'image'.
@@ -443,6 +460,7 @@
         let psdTree = null;
         let flatLayers = [];
         let clothingTree = [];
+        let isAuthenticated = false;
 
         // DOM Elements
         const canvas = document.getElementById('preview-canvas');
@@ -455,11 +473,12 @@
         const authError = document.getElementById('auth-error');
         const bgImageLayer = document.getElementById('bg-image-layer');
         const bgVideoLayer = document.getElementById('bg-video-layer');
+        const debugVersionEl = document.getElementById('debug-version');
 
         // Target folders that enforce at least 1 active piece
         const RESTRICTED_FOLDERS = ["pants", "tops"];
 
-        // Setup background media source
+        // Setup background media source (Only invoked after successful login)
         function setupBackgroundMedia() {
             if (BACKGROUND_CONFIG.type === "video" && BACKGROUND_CONFIG.videoSrc) {
                 bgVideoLayer.src = BACKGROUND_CONFIG.videoSrc;
@@ -480,6 +499,7 @@
 
                 // Handle Tab/Page visibility changes to pause audio/video when page is hidden
                 document.addEventListener("visibilitychange", () => {
+                    if (!isAuthenticated) return;
                     if (document.hidden) {
                         bgVideoLayer.pause();
                     } else if (BACKGROUND_CONFIG.type === "video") {
@@ -495,6 +515,7 @@
         // Handles user gesture (clicks/touches/keypresses) to enable audio & video playback
         function setupUserInteractionHandler() {
             const startMediaOnInteraction = () => {
+                if (!isAuthenticated) return;
                 if (BACKGROUND_CONFIG.type === "video" && bgVideoLayer.paused) {
                     bgVideoLayer.muted = false;
                     bgVideoLayer.play().then(() => {
@@ -529,8 +550,6 @@
 
         // --- URL PARAMETER AUTO-LOGIN & INIT ---
         window.addEventListener('DOMContentLoaded', () => {
-            setupBackgroundMedia();
-
             const urlParams = new URLSearchParams(window.location.search);
             const userParam = urlParams.get('user');
             const pinParam = urlParams.get('pin');
@@ -553,15 +572,36 @@
             }
 
             try {
-                const snapshot = await database.ref(`users/${usernameInput}/pin`).once('value');
-                const storedPin = snapshot.val();
+                // Fetch the entire user object to check both 'pin' and 'canEdit'
+                const snapshot = await database.ref(`users/${usernameInput}`).once('value');
+                const userData = snapshot.val();
 
-                if (storedPin !== null && String(storedPin) === pinInput) {
-                    authOverlay.style.display = 'none';
-                    initViewer();
-                } else {
+                if (!userData) {
                     showAuthError("Invalid username or PIN");
+                    return;
                 }
+
+                const storedPin = userData.pin;
+                const canEdit = userData.canEdit;
+
+                // Verify PIN match
+                if (storedPin === null || String(storedPin) !== pinInput) {
+                    showAuthError("Invalid username or PIN");
+                    return;
+                }
+
+                // Check if user has edit permissions
+                if (canEdit !== true) {
+                    showAuthError("Access denied: that account isn't allowed to be used for this specific application");
+                    return;
+                }
+
+                // Set authentication flag, hide login, start background media & initialize application
+                isAuthenticated = true;
+                authOverlay.style.display = 'none';
+                setupBackgroundMedia();
+                initViewer();
+
             } catch (err) {
                 console.error("Database auth error:", err);
                 showAuthError("Authentication error. Check connection.");
@@ -629,6 +669,13 @@
                 loadingText.innerText = "Applying configuration...";
                 const jsonData = await jsonResponse.json();
                 clothingTree = jsonData.tree || jsonData.items || [];
+
+                // Display version in the bottom left debug text field
+                if (jsonData.version) {
+                    debugVersionEl.innerText = `v${jsonData.version}`;
+                } else {
+                    debugVersionEl.innerText = "v0.0.1";
+                }
 
                 // Render UI and apply visibility
                 renderClothingList();
