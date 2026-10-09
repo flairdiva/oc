@@ -623,17 +623,14 @@
         function resolveLayer(ref) {
             if (!ref) return null;
 
-            // Tier 1: Exact Path Match
             if (layerByPathMap.has(ref)) {
                 return layerByPathMap.get(ref);
             }
 
-            // Tier 2: Legacy ID Match ("layer_14")
             if (layerByIdMap.has(ref)) {
                 return layerByIdMap.get(ref);
             }
 
-            // Tier 3: Layer Title / Name Match
             let layerName = ref;
             if (ref.includes('/')) {
                 layerName = ref.split('/').pop();
@@ -648,32 +645,47 @@
             return null;
         }
 
-        // --- INITIALIZATION ---
+        // --- INITIALIZATION (SYSTEM.PSDC UNPACKER) ---
         async function initViewer() {
             try {
-                loadingText.innerText = "Fetching template files...";
+                loadingText.innerText = "Fetching system package (system.psdc)...";
                 
-                const [psdResponse, jsonResponse] = await Promise.all([
-                    fetch('./themplate.psd'),
-                    fetch('./ClothingData.json')
-                ]);
+                const response = await fetch('./system.psdc');
+                if (!response.ok) throw new Error("Failed to load 'system.psdc'");
 
-                if (!psdResponse.ok) throw new Error("Failed to load 'themplate.psd'");
-                if (!jsonResponse.ok) throw new Error("Failed to load 'ClothingData.json'");
+                loadingText.innerText = "Unpacking package binaries...";
+                const arrayBuffer = await response.arrayBuffer();
+                const view = new DataView(arrayBuffer);
+                const decoder = new TextDecoder();
 
-                loadingText.innerText = "Parsing PSD model...";
-                const psdBuffer = await psdResponse.arrayBuffer();
-                
-                psdTree = agPsd.readPsd(psdBuffer, {
+                // Decode Header Magic ("PSDMAN_V1")
+                const magic = decoder.decode(new Uint8Array(arrayBuffer, 0, 9));
+                if (magic !== "PSDMAN_V1") {
+                    throw new Error("Invalid or corrupted system.psdc file format!");
+                }
+
+                const jsonLength = view.getUint32(9, false);
+                const psdLength = view.getUint32(13, false);
+
+                const headerLen = 9 + 8;
+                const jsonBytes = new Uint8Array(arrayBuffer, headerLen, jsonLength);
+                const psdBytes = arrayBuffer.slice(headerLen + jsonLength, headerLen + jsonLength + psdLength);
+
+                const jsonStr = decoder.decode(jsonBytes);
+                const jsonData = JSON.parse(jsonStr);
+
+                loadingText.innerText = "Parsing PSD canvas model...";
+                psdTree = agPsd.readPsd(psdBytes, {
                     skipImageData: false,
                     useCanvas: true,
                     skipThumbnail: true
                 });
 
+                delete psdTree.canvas;
+
                 canvas.width = psdTree.width;
                 canvas.height = psdTree.height;
 
-                // Clear and rebuild lookup maps
                 flatLayers = [];
                 layerByPathMap.clear();
                 layerByIdMap.clear();
@@ -698,9 +710,10 @@
                         node.top = 0;
                     }
 
-                    flatLayers.push(node);
+                    if (node !== psdTree) {
+                        flatLayers.push(node);
+                    }
 
-                    // Build lookup paths
                     const path = getLayerPath(node);
                     if (path) {
                         node._path = path;
@@ -722,9 +735,7 @@
 
                 normalizeNode(psdTree);
 
-                // Load JSON Config
-                loadingText.innerText = "Applying configuration...";
-                const jsonData = await jsonResponse.json();
+                loadingText.innerText = "Applying clothing configuration...";
                 clothingTree = jsonData.tree || jsonData.items || [];
 
                 if (jsonData.version) {
@@ -733,11 +744,9 @@
                     debugVersionEl.innerText = "v0.0.1";
                 }
 
-                // Render UI and apply visibility
                 renderClothingList();
                 syncLayersFromClothing();
 
-                // Hide Loading Screen
                 loadingOverlay.style.display = 'none';
 
             } catch (error) {
@@ -754,10 +763,9 @@
             function drawNode(node) {
                 if (node.hidden) return;
                 
-                // Read and set the layer opacity (defaults to 1 if undefined)
                 const opacity = (typeof node.opacity === 'number') ? node.opacity : 1;
                 
-                if (node.canvas) {
+                if (node !== psdTree && node.canvas) {
                     ctx.save();
                     ctx.globalAlpha = opacity;
                     ctx.drawImage(node.canvas, 0, 0);
@@ -775,26 +783,70 @@
         function syncLayersFromClothing() {
             const allItems = getAllClothingItems();
             
-            // Map managed PSD layers to active visibility state
-            const activeLayers = new Set();
-            const managedLayers = new Set();
+            const activeNormalLayers = new Set();
+            const activeInvertedLayers = new Set();
 
             allItems.forEach(item => {
-                const refs = item.layerIds || [];
-                refs.forEach(ref => {
-                    const layer = resolveLayer(ref);
-                    if (layer) {
-                        managedLayers.add(layer);
-                        if (item.visible) {
-                            activeLayers.add(layer);
-                        }
+                if (item.visible) {
+                    if (item.layerIds) {
+                        item.layerIds.forEach(ref => {
+                            const layer = resolveLayer(ref);
+                            if (layer) activeNormalLayers.add(layer);
+                        });
                     }
-                });
+                    if (item.invertedLayerIds) {
+                        item.invertedLayerIds.forEach(ref => {
+                            const layer = resolveLayer(ref);
+                            if (layer) activeInvertedLayers.add(layer);
+                        });
+                    }
+
+                    if (item.properties) {
+                        item.properties.forEach(prop => {
+                            if (prop.enabled) {
+                                if (prop.layerIds) {
+                                    prop.layerIds.forEach(pRef => {
+                                        const layer = resolveLayer(pRef);
+                                        if (layer) activeNormalLayers.add(layer);
+                                    });
+                                }
+                                if (prop.invertedLayerIds) {
+                                    prop.invertedLayerIds.forEach(pRef => {
+                                        const layer = resolveLayer(pRef);
+                                        if (layer) activeInvertedLayers.add(layer);
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
             });
 
             flatLayers.forEach(layer => {
-                if (managedLayers.has(layer)) {
-                    layer.hidden = !activeLayers.has(layer);
+                const isManagedNormal = allItems.some(item => {
+                    const inMain = item.layerIds && item.layerIds.some(ref => resolveLayer(ref) === layer);
+                    const inProp = item.properties && item.properties.some(p => p.layerIds && p.layerIds.some(ref => resolveLayer(ref) === layer));
+                    return inMain || inProp;
+                });
+
+                const isManagedInverted = allItems.some(item => {
+                    const inMain = item.invertedLayerIds && item.invertedLayerIds.some(ref => resolveLayer(ref) === layer);
+                    const inProp = item.properties && item.properties.some(p => p.invertedLayerIds && p.invertedLayerIds.some(ref => resolveLayer(ref) === layer));
+                    return inMain || inProp;
+                });
+
+                if (isManagedNormal || isManagedInverted) {
+                    let shouldBeVisible = false;
+
+                    if (isManagedNormal && activeNormalLayers.has(layer)) {
+                        shouldBeVisible = true;
+                    }
+
+                    if (isManagedInverted && !activeInvertedLayers.has(layer)) {
+                        shouldBeVisible = true;
+                    }
+
+                    layer.hidden = !shouldBeVisible;
                 }
             });
 
@@ -836,7 +888,7 @@
                 
                 const opacity = (typeof node.opacity === 'number') ? node.opacity : 1;
 
-                if (resolvedLayers.has(node) && node.canvas) {
+                if (resolvedLayers.has(node) && node !== psdTree && node.canvas) {
                     fCtx.save();
                     fCtx.globalAlpha = opacity;
                     fCtx.drawImage(node.canvas, 0, 0);
@@ -852,7 +904,6 @@
 
             if (!hasDrawn) return null;
 
-            // Crop to visible non-transparent content
             const imgData = fCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height);
             const data = imgData.data;
             let minX = fullCanvas.width, minY = fullCanvas.height, maxX = 0, maxY = 0;
